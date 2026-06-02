@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Path Vision AI</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #0a0f1e; color: #fff; min-height: 100vh; }
+  #header { background: #0d1526; padding: 14px 16px; display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #1e3050; }
+  #header h1 { font-size: 18px; font-weight: 600; color: #e2f0ff; }
+  .badge { background: #1a3a5c; color: #7eb8f7; font-size: 11px; padding: 3px 10px; border-radius: 20px; margin-left: auto; }
+  #tabs { display: flex; background: #0d1526; border-bottom: 1px solid #1e3050; }
+  .tab { flex: 1; padding: 12px 8px; text-align: center; font-size: 13px; font-weight: 500; color: #4a6a8a; cursor: pointer; border-bottom: 2px solid transparent; }
+  .tab.active { color: #4da6ff; border-bottom-color: #4da6ff; }
+  #panel-camera { display: block; }
+  #panel-upload, #panel-settings { display: none; }
+  #view-area { position: relative; background: #000; height: 260px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  #video { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+  #canvas-overlay { position: absolute; width: 100%; height: 100%; z-index: 2; pointer-events: none; }
+  #cam-placeholder { text-align: center; z-index: 1; }
+  #cam-placeholder .ph-icon { font-size: 52px; display: block; margin-bottom: 8px; }
+  #cam-placeholder p { font-size: 13px; color: #4a6a8a; }
+  #status-bar { padding: 10px 14px; display: flex; align-items: center; gap: 8px; background: #0d1526; border-bottom: 1px solid #1e3050; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #334; flex-shrink: 0; }
+  .dot.active { background: #22c55e; animation: pulse 1.5s infinite; }
+  .dot.busy { background: #f59e0b; animation: pulse 0.7s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  #status-text { font-size: 12px; color: #4a8aaa; }
+  #result-box { margin: 14px; padding: 16px; border-radius: 14px; background: #0d1526; border: 1px solid #1e3050; min-height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; }
+  #result-icon { font-size: 36px; }
+  #result-main { font-size: 19px; font-weight: 600; text-align: center; }
+  #result-detail { font-size: 13px; color: #4a8aaa; text-align: center; }
+  #det-list { margin: 0 14px 14px; }
+  #det-list h3 { font-size: 12px; color: #4a6a8a; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .det-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; margin-bottom: 6px; border-radius: 10px; background: #0d1526; border: 1px solid #1e3050; }
+  .det-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .det-label { font-size: 13px; font-weight: 500; }
+  .det-conf { font-size: 12px; color: #4a8aaa; margin-left: auto; }
+  #controls { padding: 0 14px 16px; display: flex; gap: 10px; }
+  #btn-start { flex: 1; background: #1a6fd4; color: #fff; border: none; border-radius: 12px; padding: 15px; font-size: 15px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  #btn-start.stop { background: #dc2626; }
+  #btn-speak { background: #0d1526; color: #7eb8f7; border: 1px solid #1e3050; border-radius: 12px; padding: 15px 18px; font-size: 20px; cursor: pointer; }
+  #btn-speak:disabled { opacity: 0.35; }
+  #upload-tab { padding: 16px; }
+  #drop-zone { border: 1.5px dashed #1e3050; border-radius: 14px; padding: 32px 16px; text-align: center; cursor: pointer; margin-bottom: 12px; }
+  #drop-zone .dz-icon { font-size: 40px; display: block; margin-bottom: 8px; }
+  #drop-zone p { font-size: 13px; color: #4a8aaa; }
+  #drop-zone p span { color: #4da6ff; }
+  #file-input { display: none; }
+  #canvas-upload { width: 100%; border-radius: 12px; display: none; background: #000; margin-bottom: 12px; }
+  #btn-reset { display: none; background: transparent; color: #4a8aaa; border: 1px solid #1e3050; border-radius: 10px; padding: 8px 14px; font-size: 13px; cursor: pointer; margin-bottom: 10px; }
+  #btn-analyze { width: 100%; background: #1a6fd4; color: #fff; border: none; border-radius: 12px; padding: 15px; font-size: 15px; font-weight: 600; cursor: pointer; display: none; align-items: center; justify-content: center; gap: 8px; }
+  #upload-result { margin-top: 12px; padding: 16px; border-radius: 14px; background: #0d1526; border: 1px solid #1e3050; display: none; text-align: center; }
+  #upload-result-main { font-size: 18px; font-weight: 600; margin-bottom: 4px; }
+  #upload-result-detail { font-size: 13px; color: #4a8aaa; }
+  #settings-tab { padding: 16px; }
+  .srow { display: flex; justify-content: space-between; align-items: center; padding: 13px 0; border-bottom: 1px solid #1e3050; }
+  .slabel { font-size: 14px; color: #4a8aaa; }
+  .sval { font-size: 13px; font-weight: 500; color: #7eb8f7; font-family: monospace; }
+  select { background: #0d1526; color: #e2f0ff; border: 1px solid #1e3050; border-radius: 8px; padding: 6px 10px; font-size: 13px; }
+  input[type=range] { width: 100%; margin: 10px 0 4px; accent-color: #4da6ff; }
+  .range-row { padding: 12px 0; border-bottom: 1px solid #1e3050; }
+  .range-label { font-size: 13px; color: #4a8aaa; display: flex; justify-content: space-between; }
+  #conf-val { color: #4da6ff; font-weight: 600; }
+  .api-info { margin-top: 16px; padding: 12px; border-radius: 10px; background: #0a1628; border: 1px solid #1e3050; }
+  .api-info p { font-size: 11px; color: #4a6a8a; margin-bottom: 4px; }
+  .api-info code { font-size: 11px; color: #7eb8f7; word-break: break-all; }
+
+  /* Android TTS unlock banner */
+  #tts-banner { display: none; background: #1a3a1a; border: 1px solid #2a6a2a; border-radius: 12px; margin: 10px 14px 0; padding: 12px 14px; font-size: 13px; color: #7dcf7d; text-align: center; cursor: pointer; }
+</style>
+</head>
+<body>
+
+<div id="header">
+  <span style="font-size:22px">👁️</span>
+  <h1>Path Vision AI</h1>
+  <span class="badge">Roboflow</span>
+</div>
+
+<div id="tabs">
+  <div class="tab active" id="tab-camera" onclick="switchTab('camera')">📷 กล้องสด</div>
+  <div class="tab" id="tab-upload" onclick="switchTab('upload')">📤 อัพโหลด</div>
+  <div class="tab" id="tab-settings" onclick="switchTab('settings')">⚙️ ตั้งค่า</div>
+</div>
+
+<!-- CAMERA -->
+<div id="panel-camera">
+  <div id="tts-banner" onclick="unlockTTS()">🔊 แตะที่นี่เพื่อเปิดใช้เสียงพูด</div>
+  <div id="view-area">
+    <video id="video" autoplay playsinline muted></video>
+    <canvas id="canvas-overlay"></canvas>
+    <div id="cam-placeholder">
+      <span class="ph-icon">📵</span>
+      <p>กดปุ่มเริ่มเพื่อเปิดกล้อง</p>
+    </div>
+  </div>
+  <div id="status-bar">
+    <div class="dot" id="dot"></div>
+    <span id="status-text">พร้อมใช้งาน</span>
+  </div>
+  <div id="result-box">
+    <span id="result-icon">👁️</span>
+    <div id="result-main">รอการวิเคราะห์</div>
+    <div id="result-detail">กดเริ่มเพื่อตรวจสอบเส้นทาง</div>
+  </div>
+  <div id="det-list" style="display:none">
+    <h3>สิ่งที่ตรวจพบ</h3>
+    <div id="det-items"></div>
+  </div>
+  <div id="controls">
+    <button id="btn-start" onclick="toggleCamera()">📷 เริ่มกล้อง</button>
+    <button id="btn-speak" onclick="speakNow()" disabled>🔊</button>
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div id="panel-upload">
+  <div id="upload-tab">
+    <div id="drop-zone" onclick="document.getElementById('file-input').click()">
+      <span class="dz-icon">🖼️</span>
+      <p>แตะเพื่อเลือกรูปภาพ<br><span>รองรับ JPG, PNG, HEIC</span></p>
+    </div>
+    <input type="file" id="file-input" accept="image/*" onchange="handleFile(event)">
+    <button id="btn-reset" onclick="resetUpload()">✕ เลือกรูปใหม่</button>
+    <canvas id="canvas-upload"></canvas>
+    <button id="btn-analyze" onclick="analyzeUpload()">🔍 วิเคราะห์รูปภาพ</button>
+    <div id="upload-result">
+      <div id="upload-result-main"></div>
+      <div id="upload-result-detail"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="panel-settings">
+  <div id="settings-tab">
+    <div class="srow"><span class="slabel">API Key</span><span class="sval">n8sq...q9Pj</span></div>
+    <div class="srow"><span class="slabel">Project</span><span class="sval">glass-jqfh7 v1</span></div>
+    <div class="range-row">
+      <div class="range-label"><span>ความเชื่อมั่นขั้นต่ำ</span><span id="conf-val">40%</span></div>
+      <input type="range" id="conf-slider" min="10" max="90" value="40" step="5" oninput="document.getElementById('conf-val').textContent=this.value+'%'">
+    </div>
+    <div class="srow">
+      <span class="slabel">ความถี่วิเคราะห์</span>
+      <select id="freq-select">
+        <option value="2000">ทุก 2 วิ</option>
+        <option value="3000" selected>ทุก 3 วิ</option>
+        <option value="5000">ทุก 5 วิ</option>
+      </select>
+    </div>
+    <div class="srow">
+      <span class="slabel">ภาษาเสียง</span>
+      <select id="voice-lang">
+        <option value="th-TH">ภาษาไทย</option>
+        <option value="en-US">English</option>
+      </select>
+    </div>
+    <div class="api-info">
+      <p>Endpoint:</p>
+      <code>https://detect.roboflow.com/glass-jqfh7/1</code>
+    </div>
+  </div>
+</div>
+
+<script>
+const RF_API_KEY = "n8sqVLyxgG6y4P59q9Pj";
+const RF_PROJECT = "glass-jqfh7";
+const RF_VERSION = 1;
+
+let streaming = false;
+let mediaStream = null;
+let timer = null;
+let lastMsg = "";
+let uploadBlob = null;
+let ttsUnlocked = false;
+
+const video = document.getElementById('video');
+const overlay = document.getElementById('canvas-overlay');
+const octx = overlay.getContext('2d');
+
+// Android TTS unlock: แสดง banner ให้ user แตะ
+function checkTTSBanner() {
+  if (!ttsUnlocked) {
+    document.getElementById('tts-banner').style.display = 'block';
+  }
+}
+
+function unlockTTS() {
+  const u = new SpeechSynthesisUtterance(' ');
+  u.volume = 0;
+  u.onend = () => { ttsUnlocked = true; document.getElementById('tts-banner').style.display = 'none'; };
+  window.speechSynthesis.speak(u);
+  ttsUnlocked = true;
+  document.getElementById('tts-banner').style.display = 'none';
+}
+
+function switchTab(t) {
+  ['camera','upload','settings'].forEach(x => {
+    document.getElementById('panel-'+x).style.display = x===t ? 'block' : 'none';
+    document.getElementById('tab-'+x).classList.toggle('active', x===t);
+  });
+}
+
+function setStatus(txt, state) {
+  document.getElementById('status-text').textContent = txt;
+  const d = document.getElementById('dot');
+  d.className = 'dot';
+  if (state==='active') d.classList.add('active');
+  else if (state==='busy') d.classList.add('busy');
+}
+
+function setResult(icon, main, detail, color) {
+  document.getElementById('result-icon').textContent = icon;
+  const m = document.getElementById('result-main');
+  m.textContent = main; m.style.color = color || '#e2f0ff';
+  document.getElementById('result-detail').textContent = detail;
+}
+
+async function toggleCamera() {
+  streaming ? stopCamera() : await startCamera();
+}
+
+async function startCamera() {
+  checkTTSBanner();
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: 'environment' } },
+      audio: false
+    });
+    video.srcObject = mediaStream;
+    await video.play();
+    document.getElementById('cam-placeholder').style.display = 'none';
+    streaming = true;
+    document.getElementById('btn-start').textContent = '⏹ หยุด';
+    document.getElementById('btn-start').classList.add('stop');
+    document.getElementById('btn-speak').disabled = false;
+    setStatus('กำลังทำงาน', 'active');
+    const freq = parseInt(document.getElementById('freq-select').value);
+    setTimeout(snap, 1000);
+    timer = setInterval(snap, freq);
+  } catch(e) {
+    alert('ไม่สามารถเปิดกล้องได้\n\nกรุณาอนุญาต Camera permission ใน browser ก่อนครับ\n\nError: ' + e.message);
+  }
+}
+
+function stopCamera() {
+  clearInterval(timer);
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
+  mediaStream = null; streaming = false;
+  document.getElementById('btn-start').textContent = '📷 เริ่มกล้อง';
+  document.getElementById('btn-start').classList.remove('stop');
+  document.getElementById('btn-speak').disabled = true;
+  document.getElementById('cam-placeholder').style.display = 'block';
+  octx.clearRect(0, 0, overlay.width, overlay.height);
+  setStatus('หยุดแล้ว', '');
+}
+
+function snap() {
+  if (!streaming || video.readyState < 2) return;
+  const c = document.createElement('canvas');
+  c.width = video.videoWidth || 640;
+  c.height = video.videoHeight || 480;
+  c.getContext('2d').drawImage(video, 0, 0);
+  c.toBlob(b => { if (b) callRoboflow(b, true); }, 'image/jpeg', 0.82);
+}
+
+async function blobToBase64(blob) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function callRoboflow(blob, isCamera) {
+  const conf = parseInt(document.getElementById('conf-slider').value) / 100;
+  if (isCamera) setStatus('กำลังวิเคราะห์...', 'busy');
+  try {
+    const b64 = await blobToBase64(blob);
+    const res = await fetch(
+      `https://detect.roboflow.com/${RF_PROJECT}/${RF_VERSION}?api_key=${RF_API_KEY}&confidence=${conf}&overlap=0.3`,
+      { method: 'POST', body: b64, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error(`HTTP ${res.status}: ${errText}`);
+    }
+    const data = await res.json();
+    handlePredictions(data, isCamera);
+    if (isCamera) setStatus('กำลังทำงาน', 'active');
+  } catch(e) {
+    if (isCamera) {
+      setStatus('ข้อผิดพลาด', '');
+      setResult('⚠️', 'เชื่อมต่อไม่ได้', e.message, '#ef4444');
+    } else {
+      showUploadResult('⚠️', 'เชื่อมต่อไม่ได้', e.message, '#ef4444');
+    }
+  }
+}
+
+function isPathClass(cl) {
+  return /path|walkway|road|floor|sidewalk|pavement|clear|glass/.test(cl);
+}
+
+function handlePredictions(data, isCamera) {
+  const preds = data.predictions || [];
+  const iw = data.image?.width || 640;
+  const ih = data.image?.height || 480;
+
+  // สิ่งที่รู้จักว่าเป็นทาง = path, สิ่งอื่นทั้งหมด (รวมสิ่งที่ไม่รู้จัก) = กีดขวาง
+  let obstacles = [], paths = [];
+  preds.forEach(p => {
+    const cl = (p.class || '').toLowerCase();
+    const item = { label: p.class, conf: Math.round(p.confidence * 100), x: p.x, y: p.y, w: p.width, h: p.height, iw, ih };
+    if (isPathClass(cl)) paths.push(item);
+    else obstacles.push(item);
+  });
+
+  let icon, main, detail, color, speech;
+
+  if (preds.length === 0) {
+    icon = '✅'; main = 'เส้นทางโล่ง'; detail = 'ไม่พบสิ่งกีดขวาง สามารถเดินได้';
+    color = '#22c55e'; speech = 'เส้นทางโล่ง เดินต่อได้';
+  } else if (obstacles.length > 0) {
+    const names = obstacles.map(o => o.label).join(', ');
+    icon = '🚧'; main = `พบสิ่งกีดขวาง ${obstacles.length} จุด`; detail = names;
+    color = '#ef4444'; speech = `ระวัง! พบสิ่งกีดขวาง ${obstacles.length} รายการ กรุณาหยุดหรือเปลี่ยนทิศทาง`;
+  } else {
+    icon = '✅'; main = 'เส้นทางปลอดภัย'; detail = `พบ ${paths.map(p => p.label).join(', ')}`;
+    color = '#22c55e'; speech = 'พบเส้นทาง สามารถเดินต่อไปได้';
+  }
+
+  const allItems = [...obstacles, ...paths];
+
+  if (isCamera) {
+    setResult(icon, main, detail, color);
+    renderDetections(allItems);
+    drawBoxes(allItems, overlay, video.clientWidth, video.clientHeight);
+    if (speech !== lastMsg) { lastMsg = speech; speak(speech); }
+  } else {
+    showUploadResult(icon, main, detail, color);
+    const cu = document.getElementById('canvas-upload');
+    drawBoxes(allItems, cu, cu.width, cu.height);
+    speak(speech);
+  }
+}
+
+function isObstacleItem(label) {
+  return !isPathClass((label || '').toLowerCase());
+}
+
+function drawBoxes(items, canvas, cw, ch) {
+  const ctx = canvas.getContext('2d');
+  if (canvas === overlay) { canvas.width = cw; canvas.height = ch; }
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  items.forEach(item => {
+    const sx = canvas.width / item.iw;
+    const sy = canvas.height / item.ih;
+    const x = (item.x - item.w / 2) * sx;
+    const y = (item.y - item.h / 2) * sy;
+    const w = item.w * sx, h = item.h * sy;
+    const color = isObstacleItem(item.label) ? '#ef4444' : '#22c55e';
+    ctx.strokeStyle = color; ctx.lineWidth = 2.5;
+    ctx.strokeRect(x, y, w, h);
+    const lbl = `${item.label} ${item.conf}%`;
+    ctx.font = 'bold 12px sans-serif';
+    const tw = ctx.measureText(lbl).width;
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y - 20, tw + 10, 20);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(lbl, x + 5, y - 6);
+  });
+}
+
+function renderDetections(items) {
+  const list = document.getElementById('det-list');
+  const el = document.getElementById('det-items');
+  if (!items.length) { list.style.display = 'none'; return; }
+  list.style.display = 'block';
+  el.innerHTML = items.map(i => {
+    const color = isObstacleItem(i.label) ? '#ef4444' : '#22c55e';
+    return `<div class="det-item">
+      <div class="det-dot" style="background:${color}"></div>
+      <span class="det-label">${i.label}</span>
+      <span class="det-conf">${i.conf}%</span>
+    </div>`;
+  }).join('');
+}
+
+// TTS — Android ต้องการ user gesture ก่อน
+function speak(text) {
+  if (!text || !window.speechSynthesis) return;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = document.getElementById('voice-lang').value;
+  u.rate = 0.92; u.pitch = 1.0; u.volume = 1.0;
+  // Android workaround: resume ก่อน speak
+  if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+  const voices = window.speechSynthesis.getVoices();
+  const lang = u.lang.split('-')[0];
+  const v = voices.find(v => v.lang && v.lang.startsWith(lang));
+  if (v) u.voice = v;
+  window.speechSynthesis.speak(u);
+  // Android bug: sometimes cuts off — re-trigger if silent after 500ms
+  setTimeout(() => {
+    if (window.speechSynthesis.paused) window.speechSynthesis.resume();
+  }, 500);
+}
+
+function speakNow() {
+  unlockTTS();
+  if (lastMsg) speak(lastMsg);
+}
+
+// Upload
+function handleFile(e) {
+  const file = e.target.files[0];
+  if (file) loadImage(file);
+}
+
+function loadImage(file) {
+  uploadBlob = file;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const c = document.getElementById('canvas-upload');
+      c.width = img.naturalWidth; c.height = img.naturalHeight;
+      c.getContext('2d').drawImage(img, 0, 0);
+      c.style.display = 'block';
+      document.getElementById('drop-zone').style.display = 'none';
+      document.getElementById('btn-reset').style.display = 'inline-block';
+      document.getElementById('btn-analyze').style.display = 'flex';
+      document.getElementById('upload-result').style.display = 'none';
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function resetUpload() {
+  uploadBlob = null;
+  document.getElementById('canvas-upload').style.display = 'none';
+  document.getElementById('drop-zone').style.display = 'block';
+  document.getElementById('btn-reset').style.display = 'none';
+  document.getElementById('btn-analyze').style.display = 'none';
+  document.getElementById('upload-result').style.display = 'none';
+  document.getElementById('file-input').value = '';
+}
+
+async function analyzeUpload() {
+  if (!uploadBlob) return;
+  unlockTTS();
+  document.getElementById('upload-result').style.display = 'block';
+  document.getElementById('upload-result-main').textContent = '⏳ กำลังวิเคราะห์...';
+  document.getElementById('upload-result-detail').textContent = '';
+  await callRoboflow(uploadBlob, false);
+}
+
+function showUploadResult(icon, main, detail, color) {
+  const box = document.getElementById('upload-result');
+  box.style.display = 'block';
+  const m = document.getElementById('upload-result-main');
+  m.textContent = icon + ' ' + main; m.style.color = color;
+  document.getElementById('upload-result-detail').textContent = detail;
+}
+
+// drag & drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); });
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  const f = e.dataTransfer.files[0];
+  if (f && f.type.startsWith('image/')) loadImage(f);
+});
+
+// preload voices
+if (window.speechSynthesis) {
+  window.speechSynthesis.getVoices();
+  window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+}
+</script>
+</body>
+</html>
